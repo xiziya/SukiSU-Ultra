@@ -32,7 +32,7 @@ extern void context_struct_compute_av_fn(struct policydb *policydb,
 				      u16 tclass,
 				      struct av_decision *avd,
 				      struct extended_perms *xperms);
-#else
+#elif defined(KSU_COMPAT_USE_SELINUX_STATE)
 struct selinux_state fake_state;
 #endif
 #ifdef KSU_COMPAT_USE_STATIC_KEY
@@ -42,6 +42,10 @@ struct page *fake_status = NULL;
 
 void initialize_fake_status()
 {
+#if !defined(KSU_COMPAT_USE_SELINUX_STATE)
+    return;
+#else
+#if defined(KSU_COMPAT_USE_SELINUX_STATE)
     mutex_lock(&selinux_state.status_lock);
     if (fake_status)
         goto out;
@@ -71,6 +75,7 @@ void initialize_fake_status()
 
 out:
     mutex_unlock(&selinux_state.status_lock);
+#endif
 }
 
 void ksu_selinux_hide_handle_second_stage()
@@ -98,7 +103,9 @@ static int ksu_selinux_hide_enable()
         return -EAGAIN;
     }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+#if !defined(KSU_COMPAT_USE_SELINUX_STATE)
+    pr_info("selinux_hide: legacy policydb backend enabled\n");
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 #else
     fake_state.initialized = true;
     fake_state.policy = backup_sepolicy;
@@ -161,11 +168,13 @@ void __exit ksu_selinux_hide_exit(void)
     }
     mutex_unlock(&selinux_hide_mutex);
     ksu_unregister_feature_handler(KSU_FEATURE_SELINUX_HIDE);
+#if defined(KSU_COMPAT_USE_SELINUX_STATE)
     mutex_lock(&selinux_state.status_lock);
     if (fake_status)
         __free_page(fake_status);
     fake_status = NULL;
     mutex_unlock(&selinux_state.status_lock);
+#endif
 }
 
 void ksu_selinux_hide_drop_backup_if_unused()
