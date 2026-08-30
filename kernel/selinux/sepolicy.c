@@ -1109,7 +1109,6 @@ bool ksu_genfscon(struct policydb *db, const char *fs_name, const char *path, co
     return add_genfscon(db, fs_name, path, ctx);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 #include "ss/avtab.h"
 #include "ss/constraint.h"
 #include "ss/ebitmap.h"
@@ -1118,6 +1117,35 @@ bool ksu_genfscon(struct policydb *db, const char *fs_name, const char *path, co
 #include "ss/services.h"
 
 // ======== sepolicy ========
+struct policydb *ksu_dup_policydb(struct policydb *old_pol)
+{
+    struct policydb *new_pol;
+    struct policy_file fp;
+    void *data;
+    int ret;
+    if (!old_pol || !old_pol->len)
+        return ERR_PTR(-EINVAL);
+    data = vmalloc(old_pol->len);
+    if (!data) return ERR_PTR(-ENOMEM);
+    fp.data = data; fp.len = old_pol->len;
+    ret = policydb_write(old_pol, &fp);
+    if (ret) { kvfree(data); return ERR_PTR(ret); }
+    new_pol = kzalloc(sizeof(*new_pol), GFP_KERNEL);
+    if (!new_pol) { kvfree(data); return ERR_PTR(-ENOMEM); }
+    fp.data = data; fp.len = old_pol->len;
+    ret = policydb_read(new_pol, &fp);
+    kvfree(data);
+    if (ret) { kfree(new_pol); return ERR_PTR(ret); }
+    new_pol->len = old_pol->len;
+    return new_pol;
+}
+
+void ksu_destroy_policydb(struct policydb *pol)
+{
+    if (pol) { policydb_destroy(pol); kfree(pol); }
+}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 
 void ksu_destroy_sepolicy(struct selinux_policy *pol)
 {
@@ -1198,4 +1226,3 @@ out_free_data:
 
     return ERR_PTR(ret);
 }
-#endif

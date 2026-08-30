@@ -2,6 +2,11 @@
 #define SELINUX_POLICY_INSTEAD_SELINUX_SS
 struct selinux_policy *backup_sepolicy;
 #endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 0)
+struct policydb *backup_policydb;
+struct sidtab *backup_sidtab;
+extern struct sidtab *selinux_policy_sidtab(void);
+#endif
 
 #define ALL NULL
 
@@ -55,7 +60,8 @@ static inline rwlock_t *ksu_get_policy_rwlock(void)
 #else
 static inline rwlock_t *ksu_get_policy_rwlock(void)
 {
-    return NULL;
+    extern rwlock_t *selinux_policy_rwlock(void);
+    return selinux_policy_rwlock();
 }
 #endif
 
@@ -206,6 +212,19 @@ out_unlock:
 
     cpumask_t old_mask;
     db = get_policydb();
+
+    if (!backup_policydb) {
+        backup_policydb = ksu_dup_policydb(db);
+        if (IS_ERR(backup_policydb))
+            backup_policydb = NULL;
+        else {
+            backup_sidtab = kzalloc(sizeof(*backup_sidtab), GFP_KERNEL);
+            if (backup_sidtab && policydb_load_isids(backup_policydb, backup_sidtab)) {
+                kfree(backup_sidtab);
+                backup_sidtab = NULL;
+            }
+        }
+    }
 
     rwlock_t *lock = ksu_get_policy_rwlock();
     if (!lock)

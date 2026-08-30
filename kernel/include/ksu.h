@@ -11,6 +11,11 @@ extern struct cred *ksu_cred;
 extern bool allow_shell;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0)
 extern struct selinux_policy *backup_sepolicy;
+#else
+struct policydb;
+struct sidtab;
+extern struct policydb *backup_policydb;
+extern struct sidtab *backup_sidtab;
 #endif
 extern bool ksu_no_custom_rc;
 

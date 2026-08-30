@@ -8,6 +8,8 @@ struct selinux_policy *ksu_dup_sepolicy(struct selinux_policy *old_pol);
 
 void ksu_destroy_sepolicy(struct selinux_policy *orig);
 #endif
+struct policydb *ksu_dup_policydb(struct policydb *old_pol);
+void ksu_destroy_policydb(struct policydb *pol);
 
 // Operation on types
 bool ksu_type(struct policydb *db, const char *name, const char *attr);
